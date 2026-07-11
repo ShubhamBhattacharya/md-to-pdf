@@ -6,3 +6,33 @@ body {
   background-color: #0E0E0D;
   color: #f3f4f6;
 }
+
+/* 
+  Render the PDF off-screen while the user is looking at the app. 
+  Paged.js NEEDS it in the DOM to calculate page heights. 
+*/
+#print-container {
+  position: absolute;
+  top: -9999px;
+  left: -9999px;
+  width: 100vw;
+}
+
+/* 
+  The "Print Swap": When the OS print dialog opens, 
+  hide the React app and snap the PDF into view. 
+*/
+@media print {
+  body {
+    background-color: white !important;
+  }
+  #root {
+    display: none !important;
+  }
+  #print-container {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    width: auto !important;
+  }
+}
