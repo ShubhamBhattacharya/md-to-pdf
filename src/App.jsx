@@ -102,10 +102,10 @@ function App() {
     }
   };
 
-  const getThemeCSS = () => {
+ const getThemeCSS = () => {
     // ---------------------------------------------------------
     // THE PRINT TYPESETTING ENGINE
-    // Fixes tables cutting off, large headings, and pagination
+    // Adjusted for corporate/strategy document readability
     // ---------------------------------------------------------
     const baseCSS = `
       @page { size: A4; margin: 15mm 20mm; }
@@ -113,27 +113,24 @@ function App() {
       
       .markdown-body { font-size: 10pt; line-height: 1.55; color: #111; }
       
-      /* Typography & Headings */
-      .markdown-body h1 { font-size: 18pt; margin-top: 1.5em; margin-bottom: 0.5em; page-break-after: avoid; font-weight: 800; line-height: 1.2; }
-      .markdown-body h2 { font-size: 14pt; margin-top: 1.5em; margin-bottom: 0.5em; page-break-after: avoid; font-weight: 700; border-bottom: 1px solid #eaeaea; padding-bottom: 4px; }
-      .markdown-body h3 { font-size: 12pt; margin-top: 1.2em; margin-bottom: 0.4em; page-break-after: avoid; font-weight: 600; }
+      /* Typography & Headings - SCALED DOWN FOR CORPORATE PRINT */
+      .markdown-body h1 { font-size: 14pt; margin-top: 1em; margin-bottom: 0.5em; page-break-after: avoid; font-weight: 800; line-height: 1.2; color: #000; }
+      .markdown-body h2 { font-size: 12pt; margin-top: 1.2em; margin-bottom: 0.4em; page-break-after: avoid; font-weight: 700; border-bottom: 1px solid #eaeaea; padding-bottom: 4px; color: #111; }
+      .markdown-body h3 { font-size: 11pt; margin-top: 1em; margin-bottom: 0.3em; page-break-after: avoid; font-weight: 600; color: #222; }
       .markdown-body p { margin-bottom: 0.8em; widows: 2; orphans: 2; }
       
       /* Bullet Points & Lists */
       .markdown-body ul, .markdown-body ol { margin-left: 1.5em; margin-bottom: 1em; padding-left: 0; }
       .markdown-body li { margin-bottom: 0.3em; page-break-inside: avoid; }
       
-      /* 
-         Table Fixes - THIS PREVENTS CUT OFFS 
-         Forces table to stay within 100% width and breaks long words
-      */
+      /* Table Fixes - Strict Width Constraints */
       .markdown-body table { 
         width: 100%; 
         max-width: 100%;
         border-collapse: collapse; 
         margin: 1.2em 0; 
-        font-size: 8.5pt; /* Scaled down for dense tables */
-        table-layout: fixed; /* Forces strict width calculation */
+        font-size: 8.5pt; 
+        table-layout: fixed; 
         word-wrap: break-word; 
         overflow-wrap: break-word;
       }
@@ -169,7 +166,7 @@ function App() {
     
     return baseCSS + `
       .markdown-body { font-family: "Inter", system-ui, -apple-system, sans-serif; }
-      .markdown-body h1, .markdown-body h2, .markdown-body h3 { letter-spacing: -0.02em; color: #0E0E0D; }
+      .markdown-body h1, .markdown-body h2, .markdown-body h3 { letter-spacing: -0.01em; color: #0E0E0D; }
     `;
   };
 
