@@ -2,54 +2,65 @@ import React, { useState, useEffect } from 'react';
 import { parseMarkdown } from './utils/parser';
 
 // ==========================================
-// 1. The iOS-Safe Print Engine Component
+// 1. The iOS-Safe Print Preview Engine
 // ==========================================
-function PrintEngine({ htmlContent, themeCSS, onComplete }) {
+function PrintPreview({ html, css, onCancel }) {
+  const [ready, setReady] = useState(false);
+
   useEffect(() => {
     let isCancelled = false;
     
-    // Inject Theme CSS
+    // 1. Inject Theme CSS
     const style = document.createElement('style');
     style.id = 'print-theme-css';
-    style.innerHTML = themeCSS;
+    style.innerHTML = css;
     document.head.appendChild(style);
 
-    // Run Paged.js
-    const container = document.getElementById('paged-target');
+    // 2. Run Paged.js to render the visual pages
+    const container = document.getElementById('paged-container');
+    const contentDiv = document.createElement('div');
+    contentDiv.innerHTML = html;
+
     const { Previewer } = window.PagedPolyfill;
     const previewer = new Previewer();
     
-    const contentDiv = document.createElement('div');
-    contentDiv.innerHTML = htmlContent;
-
     previewer.preview(contentDiv, [], container).then(() => {
-      if (isCancelled) return;
-      
-      // THE IOS FIX: Force Safari to wait for a physical screen repaint 
-      // before calling print, ensuring it doesn't screenshot the old UI.
-      setTimeout(() => {
-        window.print();
-        
-        // Safari suspends JS execution while the print dialog is open.
-        // Once the user saves or cancels, JS resumes and we restore the app.
-        setTimeout(() => {
-          onComplete();
-        }, 1000);
-      }, 800);
+      if (!isCancelled) setReady(true);
     });
 
     return () => {
       isCancelled = true;
-      if (document.getElementById('print-theme-css')) {
-        document.head.removeChild(style);
-      }
+      document.head.removeChild(style);
+      // Clean up injected Paged.js styles when returning to the editor
+      document.querySelectorAll('style[data-pagedjs-inserted]').forEach(el => el.remove());
     };
-  }, [htmlContent, themeCSS, onComplete]);
+  }, [html, css]);
 
-  // This is the ONLY thing in the DOM right now.
-  return <div id="paged-target" className="bg-white text-black min-h-screen w-full"></div>;
+  return (
+    <div className="relative min-h-screen bg-charcoal">
+      {/* Container for the visual A4 pages */}
+      <div id="paged-container" className="pb-32 overflow-x-auto"></div>
+      
+      {/* Floating Action Bar */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#1A1A1A] border-t border-gray-800 flex gap-4 shadow-2xl no-print z-50">
+        <button 
+          onClick={onCancel} 
+          className="flex-1 py-4 bg-gray-800 rounded-xl text-white font-bold transition-colors hover:bg-gray-700"
+        >
+          Back to Editor
+        </button>
+        {/* THIS is the button iOS Safari wants. 100% synchronous direct print command. */}
+        <button 
+          onClick={() => window.print()} 
+          disabled={!ready}
+          className="flex-1 py-4 bg-neonGreen rounded-xl text-black font-bold disabled:opacity-50 transition-colors hover:bg-[#3bce6b]"
+        >
+          {ready ? 'Save as PDF' : 'Rendering Pages...'}
+        </button>
+      </div>
+    </div>
+  );
 }
-
 
 // ==========================================
 // 2. The Main Application
@@ -59,9 +70,8 @@ function App() {
   const [fileText, setFileText] = useState('');
   const [theme, setTheme] = useState('minimalist');
   const [vault, setVault] = useState([]);
-  const [printData, setPrintData] = useState(null); // Triggers the Hard Unmount
+  const [printData, setPrintData] = useState(null); 
 
-  // Load vault on mount
   useEffect(() => {
     const saved = localStorage.getItem('mdpdf_vault');
     if (saved) setVault(JSON.parse(saved));
@@ -74,7 +84,6 @@ function App() {
       setFile(selected);
       setFileText(text);
       
-      // Save to local vault
       const newEntry = { 
         id: Date.now().toString(), 
         name: selected.name, 
@@ -95,12 +104,11 @@ function App() {
   };
 
   const deleteFromVault = (e, id) => {
-    e.stopPropagation(); // Prevent the click from loading the file
+    e.stopPropagation(); // Prevents the click from triggering loadFromVault
     const newVault = vault.filter(v => v.id !== id);
     setVault(newVault);
     localStorage.setItem('mdpdf_vault', JSON.stringify(newVault));
     
-    // Clear current selection if we just deleted it
     if (file && vault.find(v => v.id === id)?.name === file.name) {
       setFile(null);
       setFileText('');
@@ -135,7 +143,6 @@ function App() {
     if (!fileText) return;
     try {
       const htmlContent = await parseMarkdown(fileText);
-      // Setting this state unmounts the main UI and mounts the PrintEngine
       setPrintData({ html: htmlContent, css: getThemeCSS() });
     } catch (error) {
       console.error(error);
@@ -143,22 +150,17 @@ function App() {
     }
   };
 
-  // ==========================================
-  // HARD UNMOUNT SWITCH
-  // ==========================================
+  // Switch to Preview Mode if data exists
   if (printData) {
     return (
-      <PrintEngine 
-        htmlContent={printData.html} 
-        themeCSS={printData.css} 
-        onComplete={() => setPrintData(null)} 
+      <PrintPreview 
+        html={printData.html} 
+        css={printData.css} 
+        onCancel={() => setPrintData(null)} 
       />
     );
   }
 
-  // ==========================================
-  // MAIN UI
-  // ==========================================
   return (
     <div className="relative min-h-screen bg-charcoal flex flex-col lg:flex-row items-center justify-center p-6 overflow-hidden gap-8">
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-orange-500/10 blur-[150px] rounded-full pointer-events-none"></div>
@@ -197,7 +199,7 @@ function App() {
           </div>
 
           <button onClick={initiatePDFGeneration} disabled={!fileText} className={`w-full py-4 rounded-xl font-bold tracking-wide transition-all duration-300 ${!fileText ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-neonGreen text-charcoal hover:bg-[#3bce6b] shadow-[0_0_15px_rgba(74,222,128,0.2)]'}`}>
-            Generate PDF
+            Preview & Generate
           </button>
         </div>
       </div>
@@ -214,7 +216,6 @@ function App() {
                   <p className="text-gray-500 text-xs mt-1">{entry.date}</p>
                 </div>
                 
-                {/* Delete Button */}
                 <button 
                   onClick={(e) => deleteFromVault(e, entry.id)} 
                   className="text-gray-600 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-gray-800 flex-shrink-0"
