@@ -125,7 +125,7 @@ function App() {
       <div className="relative z-10 w-full max-w-md">
         <div className="mb-8 text-center lg:text-left">
           <h1 className="text-5xl font-black text-white tracking-tighter mb-2">MD<span className="text-neonGreen">PDF</span></h1>
-          <p className="text-gray-400 font-medium">Zero-cost client-side generation.</p>
+          <p className="text-gray-400 font-medium">Markdown to PDF Generator</p>
         </div>
 
         <div className="bg-[#121212] border border-gray-800 rounded-2xl p-8 shadow-2xl">
