@@ -6,13 +6,11 @@ import { parseMarkdown } from './utils/parser';
 // ==========================================
 function PrintPreview({ html, css, onCancel }) {
   useEffect(() => {
-    // Inject Theme CSS specifically for the preview
     const style = document.createElement('style');
     style.id = 'print-theme-css';
     style.innerHTML = css;
     document.head.appendChild(style);
 
-    // Ensure we start at the top of the document
     window.scrollTo(0, 0);
 
     return () => {
@@ -24,15 +22,15 @@ function PrintPreview({ html, css, onCancel }) {
 
   return (
     <div className="min-h-screen bg-gray-100 print:bg-white text-black">
-      {/* Visual Paper Container (Looks like paper on screen, spans full width on PDF) */}
-      <div className="max-w-3xl mx-auto my-0 md:my-8 p-6 md:p-12 bg-white md:shadow-2xl print:shadow-none print:m-0 print:p-0 print:max-w-none pb-32 print:pb-0">
+      {/* Visual Paper Container */}
+      <div className="max-w-[210mm] mx-auto my-0 md:my-8 p-6 md:p-12 bg-white md:shadow-2xl print:shadow-none print:m-0 print:p-0 print:max-w-none pb-32 print:pb-0">
         <div 
           className="markdown-body" 
           dangerouslySetInnerHTML={{ __html: html }} 
         />
       </div>
       
-      {/* Floating Action Bar (Hidden automatically during print) */}
+      {/* Floating Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#1A1A1A] border-t border-gray-800 flex gap-4 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] no-print z-50">
         <button 
           onClick={onCancel} 
@@ -105,31 +103,73 @@ function App() {
   };
 
   const getThemeCSS = () => {
-    // We heavily use page-break-inside: avoid; so iOS natively doesn't split paragraphs/images across pages
+    // ---------------------------------------------------------
+    // THE PRINT TYPESETTING ENGINE
+    // Fixes tables cutting off, large headings, and pagination
+    // ---------------------------------------------------------
     const baseCSS = `
-      @page { size: A4; margin: 20mm; }
-      .markdown-body { font-size: 11pt; line-height: 1.6; }
-      .markdown-body img { max-width: 100%; page-break-inside: avoid; border-radius: 4px; margin: 1.5em 0; }
-      .markdown-body h1, .markdown-body h2, .markdown-body h3 { page-break-after: avoid; color: #000; margin-top: 1.5em; margin-bottom: 0.5em; }
-      .markdown-body p { margin-bottom: 1em; }
-      .markdown-body pre, .markdown-body blockquote, .markdown-body .callout { page-break-inside: avoid; }
-      .markdown-body ul, .markdown-body ol { margin-left: 1.5em; margin-bottom: 1em; }
-      .markdown-body .callout { padding: 15px; border-left: 4px solid #4ade80; background: #f4f4f5; border-radius: 4px; margin: 1em 0; }
-      .markdown-body .callout strong { display: block; margin-bottom: 5px; color: #111; }
-      .markdown-body .wikilink { color: #4ade80; font-weight: 500; text-decoration: none; }
+      @page { size: A4; margin: 15mm 20mm; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      
+      .markdown-body { font-size: 10pt; line-height: 1.55; color: #111; }
+      
+      /* Typography & Headings */
+      .markdown-body h1 { font-size: 18pt; margin-top: 1.5em; margin-bottom: 0.5em; page-break-after: avoid; font-weight: 800; line-height: 1.2; }
+      .markdown-body h2 { font-size: 14pt; margin-top: 1.5em; margin-bottom: 0.5em; page-break-after: avoid; font-weight: 700; border-bottom: 1px solid #eaeaea; padding-bottom: 4px; }
+      .markdown-body h3 { font-size: 12pt; margin-top: 1.2em; margin-bottom: 0.4em; page-break-after: avoid; font-weight: 600; }
+      .markdown-body p { margin-bottom: 0.8em; widows: 2; orphans: 2; }
+      
+      /* Bullet Points & Lists */
+      .markdown-body ul, .markdown-body ol { margin-left: 1.5em; margin-bottom: 1em; padding-left: 0; }
+      .markdown-body li { margin-bottom: 0.3em; page-break-inside: avoid; }
+      
+      /* 
+         Table Fixes - THIS PREVENTS CUT OFFS 
+         Forces table to stay within 100% width and breaks long words
+      */
+      .markdown-body table { 
+        width: 100%; 
+        max-width: 100%;
+        border-collapse: collapse; 
+        margin: 1.2em 0; 
+        font-size: 8.5pt; /* Scaled down for dense tables */
+        table-layout: fixed; /* Forces strict width calculation */
+        word-wrap: break-word; 
+        overflow-wrap: break-word;
+      }
+      .markdown-body tr { page-break-inside: avoid; }
+      .markdown-body th, .markdown-body td { 
+        border: 1px solid #d1d5db; 
+        padding: 6px; 
+        text-align: left; 
+        vertical-align: top; 
+        word-break: break-word;
+      }
+      .markdown-body th { background-color: #f3f4f6; font-weight: 700; color: #000; }
+      
+      /* Code, Quotes, & Images */
+      .markdown-body img { max-width: 100%; height: auto; page-break-inside: avoid; border-radius: 4px; margin: 1.5em 0; display: block; }
+      .markdown-body pre { white-space: pre-wrap; overflow-wrap: break-word; background: #f8f9fa; padding: 10px; border-radius: 4px; page-break-inside: avoid; font-size: 9pt; }
+      .markdown-body code { background: #f4f4f5; padding: 2px 4px; border-radius: 3px; font-size: 0.9em; }
+      .markdown-body blockquote { border-left: 3px solid #d1d5db; padding-left: 1rem; color: #4b5563; font-style: italic; margin: 1em 0; page-break-inside: avoid; }
+      
+      /* Custom Obsidian Callouts */
+      .markdown-body .callout { padding: 12px 16px; border-left: 4px solid #4ade80; background: #f4f4f5; border-radius: 4px; margin: 1.2em 0; page-break-inside: avoid; }
+      .markdown-body .callout strong { display: block; margin-bottom: 4px; color: #111; font-size: 11pt; }
+      .markdown-body .callout p { margin-bottom: 0; }
+      .markdown-body .wikilink { color: #16a34a; font-weight: 600; text-decoration: none; }
     `;
 
     if (theme === 'academic') {
       return baseCSS + `
-        .markdown-body { font-family: "Times New Roman", Times, serif; font-size: 12pt; line-height: 2; }
-        .markdown-body h1, .markdown-body h2, .markdown-body h3 { border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+        .markdown-body { font-family: "Times New Roman", Times, serif; font-size: 11pt; line-height: 1.8; }
+        .markdown-body h1, .markdown-body h2, .markdown-body h3 { border-bottom: 1px solid #ccc; padding-bottom: 4px; font-family: Arial, sans-serif; }
       `;
     }
     
     return baseCSS + `
-      .markdown-body { font-family: "Inter", system-ui, sans-serif; }
-      .markdown-body h1, .markdown-body h2, .markdown-body h3 { font-weight: 700; letter-spacing: -0.02em; }
-      .markdown-body blockquote { border-left: 4px solid #ddd; padding-left: 1rem; color: #555; font-style: italic; }
+      .markdown-body { font-family: "Inter", system-ui, -apple-system, sans-serif; }
+      .markdown-body h1, .markdown-body h2, .markdown-body h3 { letter-spacing: -0.02em; color: #0E0E0D; }
     `;
   };
 
@@ -161,7 +201,7 @@ function App() {
       <div className="relative z-10 w-full max-w-md">
         <div className="mb-8 text-center lg:text-left">
           <h1 className="text-5xl font-black text-white tracking-tighter mb-2">MD<span className="text-neonGreen">PDF</span></h1>
-          <p className="text-gray-400 font-medium">Zero-cost client-side generation.</p>
+          <p className="text-gray-400 font-medium">Markdown to PDF Generator</p>
         </div>
 
         <div className="bg-[#121212] border border-gray-800 rounded-2xl p-8 shadow-2xl">
