@@ -2,60 +2,49 @@ import React, { useState, useEffect } from 'react';
 import { parseMarkdown } from './utils/parser';
 
 // ==========================================
-// 1. The iOS-Safe Print Preview Engine
+// 1. Native iOS-Safe Print Preview
 // ==========================================
 function PrintPreview({ html, css, onCancel }) {
-  const [ready, setReady] = useState(false);
-
   useEffect(() => {
-    let isCancelled = false;
-    
-    // 1. Inject Theme CSS
+    // Inject Theme CSS specifically for the preview
     const style = document.createElement('style');
     style.id = 'print-theme-css';
     style.innerHTML = css;
     document.head.appendChild(style);
 
-    // 2. Run Paged.js to render the visual pages
-    const container = document.getElementById('paged-container');
-    const contentDiv = document.createElement('div');
-    contentDiv.innerHTML = html;
-
-    const { Previewer } = window.PagedPolyfill;
-    const previewer = new Previewer();
-    
-    previewer.preview(contentDiv, [], container).then(() => {
-      if (!isCancelled) setReady(true);
-    });
+    // Ensure we start at the top of the document
+    window.scrollTo(0, 0);
 
     return () => {
-      isCancelled = true;
-      document.head.removeChild(style);
-      // Clean up injected Paged.js styles when returning to the editor
-      document.querySelectorAll('style[data-pagedjs-inserted]').forEach(el => el.remove());
+      if (document.getElementById('print-theme-css')) {
+        document.head.removeChild(style);
+      }
     };
-  }, [html, css]);
+  }, [css]);
 
   return (
-    <div className="relative min-h-screen bg-charcoal">
-      {/* Container for the visual A4 pages */}
-      <div id="paged-container" className="pb-32 overflow-x-auto"></div>
+    <div className="min-h-screen bg-gray-100 print:bg-white text-black">
+      {/* Visual Paper Container (Looks like paper on screen, spans full width on PDF) */}
+      <div className="max-w-3xl mx-auto my-0 md:my-8 p-6 md:p-12 bg-white md:shadow-2xl print:shadow-none print:m-0 print:p-0 print:max-w-none pb-32 print:pb-0">
+        <div 
+          className="markdown-body" 
+          dangerouslySetInnerHTML={{ __html: html }} 
+        />
+      </div>
       
-      {/* Floating Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#1A1A1A] border-t border-gray-800 flex gap-4 shadow-2xl no-print z-50">
+      {/* Floating Action Bar (Hidden automatically during print) */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#1A1A1A] border-t border-gray-800 flex gap-4 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] no-print z-50">
         <button 
           onClick={onCancel} 
           className="flex-1 py-4 bg-gray-800 rounded-xl text-white font-bold transition-colors hover:bg-gray-700"
         >
-          Back to Editor
+          Back
         </button>
-        {/* THIS is the button iOS Safari wants. 100% synchronous direct print command. */}
         <button 
           onClick={() => window.print()} 
-          disabled={!ready}
-          className="flex-1 py-4 bg-neonGreen rounded-xl text-black font-bold disabled:opacity-50 transition-colors hover:bg-[#3bce6b]"
+          className="flex-1 py-4 bg-neonGreen rounded-xl text-black font-bold transition-colors hover:bg-[#3bce6b]"
         >
-          {ready ? 'Save as PDF' : 'Rendering Pages...'}
+          Save as PDF
         </button>
       </div>
     </div>
@@ -104,7 +93,7 @@ function App() {
   };
 
   const deleteFromVault = (e, id) => {
-    e.stopPropagation(); // Prevents the click from triggering loadFromVault
+    e.stopPropagation(); 
     const newVault = vault.filter(v => v.id !== id);
     setVault(newVault);
     localStorage.setItem('mdpdf_vault', JSON.stringify(newVault));
@@ -116,26 +105,31 @@ function App() {
   };
 
   const getThemeCSS = () => {
+    // We heavily use page-break-inside: avoid; so iOS natively doesn't split paragraphs/images across pages
     const baseCSS = `
-      @page { size: A4; margin: 20mm; @bottom-right { content: counter(page); font-family: system-ui, sans-serif; font-size: 12px; color: #666; } }
-      img { max-width: 100%; page-break-inside: avoid; border-radius: 4px; }
-      h1, h2, h3 { page-break-after: avoid; }
-      .callout { padding: 15px; border-left: 4px solid #4ade80; background: #f4f4f5; border-radius: 4px; margin: 1em 0; page-break-inside: avoid; }
-      .callout strong { display: block; margin-bottom: 5px; color: #111; }
-      .wikilink { color: #4ade80; font-weight: 500; text-decoration: none; }
+      @page { size: A4; margin: 20mm; }
+      .markdown-body { font-size: 11pt; line-height: 1.6; }
+      .markdown-body img { max-width: 100%; page-break-inside: avoid; border-radius: 4px; margin: 1.5em 0; }
+      .markdown-body h1, .markdown-body h2, .markdown-body h3 { page-break-after: avoid; color: #000; margin-top: 1.5em; margin-bottom: 0.5em; }
+      .markdown-body p { margin-bottom: 1em; }
+      .markdown-body pre, .markdown-body blockquote, .markdown-body .callout { page-break-inside: avoid; }
+      .markdown-body ul, .markdown-body ol { margin-left: 1.5em; margin-bottom: 1em; }
+      .markdown-body .callout { padding: 15px; border-left: 4px solid #4ade80; background: #f4f4f5; border-radius: 4px; margin: 1em 0; }
+      .markdown-body .callout strong { display: block; margin-bottom: 5px; color: #111; }
+      .markdown-body .wikilink { color: #4ade80; font-weight: 500; text-decoration: none; }
     `;
 
     if (theme === 'academic') {
       return baseCSS + `
-        body { font-family: "Times New Roman", Times, serif; line-height: 2; color: #000; font-size: 12pt; }
-        h1, h2, h3 { color: #000; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+        .markdown-body { font-family: "Times New Roman", Times, serif; font-size: 12pt; line-height: 2; }
+        .markdown-body h1, .markdown-body h2, .markdown-body h3 { border-bottom: 1px solid #ccc; padding-bottom: 4px; }
       `;
     }
     
     return baseCSS + `
-      body { font-family: "Inter", system-ui, sans-serif; line-height: 1.6; color: #222; }
-      h1, h2, h3 { color: #0E0E0D; margin-top: 1.5em; font-weight: 700; }
-      blockquote { border-left: 4px solid #ddd; padding-left: 1rem; color: #555; font-style: italic; }
+      .markdown-body { font-family: "Inter", system-ui, sans-serif; }
+      .markdown-body h1, .markdown-body h2, .markdown-body h3 { font-weight: 700; letter-spacing: -0.02em; }
+      .markdown-body blockquote { border-left: 4px solid #ddd; padding-left: 1rem; color: #555; font-style: italic; }
     `;
   };
 
@@ -150,7 +144,6 @@ function App() {
     }
   };
 
-  // Switch to Preview Mode if data exists
   if (printData) {
     return (
       <PrintPreview 
@@ -165,7 +158,6 @@ function App() {
     <div className="relative min-h-screen bg-charcoal flex flex-col lg:flex-row items-center justify-center p-6 overflow-hidden gap-8">
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-orange-500/10 blur-[150px] rounded-full pointer-events-none"></div>
 
-      {/* Main Conversion Panel */}
       <div className="relative z-10 w-full max-w-md">
         <div className="mb-8 text-center lg:text-left">
           <h1 className="text-5xl font-black text-white tracking-tighter mb-2">MD<span className="text-neonGreen">PDF</span></h1>
@@ -204,7 +196,6 @@ function App() {
         </div>
       </div>
 
-      {/* Local Vault Sidebar */}
       {vault.length > 0 && (
         <div className="relative z-10 w-full max-w-sm">
           <h3 className="text-white font-bold tracking-wide mb-4">Local Vault</h3>
